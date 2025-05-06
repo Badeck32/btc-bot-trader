@@ -1,4 +1,4 @@
-# ✅ server.py PATCHÉ — Anti-NoneType + Logs clairs
+# ✅ server.py PATCH SIGNATURE DEBUG — Version béton armé
 from flask import Flask, request, jsonify
 import requests
 import hmac
@@ -15,8 +15,12 @@ API_PASSPHRASE = os.getenv("API_PASSPHRASE")
 BASE_URL = 'https://api.bitget.com'
 
 def generate_signature(timestamp, method, path, body=''):
+    body = body if method.upper() == 'POST' else ''  # FORCE empty string for GET
     content = f"{timestamp}{method.upper()}{path}{body}"
-    return hmac.new(API_SECRET.encode('utf-8'), content.encode('utf-8'), hashlib.sha256).hexdigest()
+    print("🧪 Signature base string:", content)
+    signature = hmac.new(API_SECRET.encode('utf-8'), content.encode('utf-8'), hashlib.sha256).hexdigest()
+    print("🔑 Signature générée:", signature)
+    return signature
 
 def get_balance():
     timestamp = str(int(time.time() * 1000))
@@ -26,8 +30,10 @@ def get_balance():
         'ACCESS-KEY': API_KEY,
         'ACCESS-SIGN': sign,
         'ACCESS-TIMESTAMP': timestamp,
-        'ACCESS-PASSPHRASE': API_PASSPHRASE
+        'ACCESS-PASSPHRASE': API_PASSPHRASE,
+        'X-BG-API-KEY': API_KEY  # 🔁 REDONDANT HEADER SÉCURITÉ
     }
+    print("📤 Headers GET balance:", headers)
     res = requests.get(BASE_URL + path, headers=headers)
     print("🔎 Résultat balance:", res.text)
     try:
@@ -71,10 +77,12 @@ def place_order(side, symbol, risk_pct=0.03, leverage=20):
         'ACCESS-SIGN': sign,
         'ACCESS-TIMESTAMP': timestamp,
         'ACCESS-PASSPHRASE': API_PASSPHRASE,
+        'X-BG-API-KEY': API_KEY,
         'Content-Type': 'application/json'
     }
+    print("📤 Headers POST:", headers)
+    print("📤 Body:", body_json)
     res = requests.post(BASE_URL + path, headers=headers, data=body_json)
-    print("📤 Envoi de l'ordre:", body_json)
     print("✅ Réponse Bitget:", res.text)
     return res.json()
 
@@ -85,6 +93,8 @@ def webhook():
         print("📩 Webhook reçu:", data)
         side = data.get("side")
         symbol = data.get("symbol")
+        print("🔐 API_KEY (log):", API_KEY)
+        print("🔐 PASSPHRASE (log):", API_PASSPHRASE)
         if side and symbol:
             result = place_order(side, symbol)
             return jsonify(result)
